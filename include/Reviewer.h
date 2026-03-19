@@ -1,26 +1,25 @@
 #pragma once
 #include <string>
 
-class Submission {
+class Reviewer {
     private:
     int id;
-    std::string title;
-    std::string authors;
+    std::string name;
     std::string email;
     int primaryDomain;
     int secondaryDomain;
 
     public:
 
-    Submission(int id, std::string title, std::string authors, std::string email, int primaryDomain, int secondaryDomain)
-    : id(id), title(title), authors(authors), email(email), primaryDomain(primaryDomain), secondaryDomain(secondaryDomain){}
+    Reviewer(int id, std::string name, std::string email, int primaryDomain, int secondaryDomain)
+    : id(id), name(name), email(email), primaryDomain(primaryDomain), secondaryDomain(secondaryDomain) {}
 
     int getId() const {
         return id;
     }
 
-    std::string getTitle() const {
-        return title;
+    std::string getName() const {
+        return name;
     }
 
     std::string getEmail() const {

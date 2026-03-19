@@ -1,0 +1,18 @@
+# 1. Executaveis e ficheiros compilados
+myProg
+*.exe
+*.o
+*.out
+
+# 2. Ficheiros de output gerados pelo programa
+output.csv
+assign.csv
+
+# 3. Pastas do VS Code ou outros IDEs
+.vscode/
+.idea/
+.vs/
+
+# 4. Documentacao gerada automaticamente
+html/
+latex/

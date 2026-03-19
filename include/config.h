@@ -1,5 +1,5 @@
 #pragma once
-#include <String>
+#include <string>
 using namespace std;
 
 class Config {
