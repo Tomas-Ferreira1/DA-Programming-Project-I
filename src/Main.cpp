@@ -1,8 +1,42 @@
 #include <iostream>
 #include <string>
+#include <fstream>
+#include <vector>
 #include "Parser.h"
+#include "Graph.h"
 
 // ---(MENU) ---
+Graph  buildNetwork(const Parser& parser){
+    auto subs = parser.getSubmissions();
+    auto revs = parser.getReviewers();
+    auto config = parser.getConfig();
+
+    int nSub = subs.size();
+    int nRev = revs.size();
+
+    int source = 0;
+    int sink = nSub + nRev + 1;
+
+    Graph g(sink + 1);
+
+    for (int i = 0; i < nSub; ++i) {
+        g.addEdge(source, i+1, config.getMinReviewsPerSubmission());
+    }
+
+    for (int j = 0; j < nRev; ++j) {
+        g.addEdge(nSub + j+1, sink, config.getMaxReviewsPerReviewer());
+    }
+
+    for (int i = 0; i < nSub; ++i) {
+        for (int j = 0; j < nRev; ++j) {
+            if (subs[i].getPrimaryDomain() == revs[j].getPrimaryDomain()){
+                g.addEdge(i+1, nSub + j+1, 1);
+            }
+        }
+    }
+    return g;
+}
+
 void runInteractiveMenu() {
     int choice = -1;
     std::string filename;
@@ -35,7 +69,46 @@ void runInteractiveMenu() {
             std::cout << " -> Ficheiro de Output configurado para: " << parser.getConfig().getOutputFileName() << "\n";
             
         } else if (choice == 2) {
-            std::cout << "\n[INFO] O algoritmo de Max-Flow ainda esta em desenvolvimento pelo meu colega...\n";
+            if (parser.getSubmissions().empty()) {
+                std::cout << "[ERRO] Primeiro precisa de ler um ficheiro (Opcao 1)!\n";
+            } else {
+                Graph g = buildNetwork(parser);
+                int nSub = parser.getSubmissions().size();
+                int nRev = parser.getReviewers().size();
+                int source = 0;
+                int sink = nSub + nRev + 1;
+
+                int flow = g.maxFlow(source, sink);
+                int totalNeeded = nSub * parser.getConfig().getMinReviewsPerSubmission();
+
+                if (flow == totalNeeded) {
+                    std::cout << "\n[SUCESSO] Todas as atribuicoes foram feitas!\n";
+                } else {
+                    std::cout << "\n[AVISSO] Nao foi possivel satisfazer todos os requesitos.\n";
+                    std::cout << "Faltam " << (totalNeeded - flow) << " revisoes no total.\n";
+                }
+
+                std::string outName = parser.getConfig().getOutputFileName();
+                std::ofstream outFile(outName);
+                if (outFile.is_open()){
+                    outFile << "#SubmissionID, ReviewerID\n";
+
+                    auto subs = parser.getSubmissions();
+                    auto revs = parser.getReviewers();
+
+                    for (int i = 1; i <= nSub; ++i) {
+                        for (const auto &edge: g.getAdj()[i]) {
+                            if (edge.flow == 1 && edge.to > nSub && edge.to <= nSub + nRev) {
+                                outFile << subs[i - 1].getId() << "," << revs[edge.to - nSub - 1].getId() << "\n";
+                            }
+                        }
+                    }
+                    outFile.close();
+                    std::cout << " -> Ficheiro gerado: " << outName << "\n";
+                } else {
+                    std::cout << "[ERRO] Nao foi possivel criar o ficheiro " << outName << "\n";
+                }
+            }
         } else if (choice != 0) {
             std::cout << "\n[ERRO] Opcao invalida. Tente novamente.\n";
         }
