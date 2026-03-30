@@ -1,3 +1,24 @@
+/**
+ * @file Main.cpp
+ * @brief Ponto de entrada da aplicacao e funcoes do menu interativo.
+ * Contem a logica principal de atribuicao (Max-Flow) e a analise de risco.
+ */
+
+/**
+ * @mainpage Sistema de Atribuicao de Revisores (Max-Flow)
+ * * @section intro_sec Introducao
+ * Bem-vindo a documentacao do projeto de Desenho de Algoritmos!
+ * * Este programa foi desenvolvido para automatizar a gestao de uma conferencia cientifica.
+ * Ele le dados de artigos e revisores, e constroi uma rede de fluxo (Grafos).
+ * * @section features_sec Funcionalidades Principais
+ * - Leitura e parseamento de ficheiros CSV.
+ * - Atribuicao inteligente de revisores usando o algoritmo de **Edmonds-Karp** (Max-Flow).
+ * - Analise de risco: simulacao de falhas de revisores para detetar gargalos na conferencia.
+ * * @section run_sec Como Executar
+ * Compile usando: `g++ src/Main.cpp src/Parser.cpp src/Graph.cpp -I include -o myProg`
+ * Execute usando: `./myProg`
+ */
+
 #include <iostream>
 #include <string>
 #include <fstream>
@@ -6,6 +27,13 @@
 #include "Graph.h"
 
 
+/**
+ * @brief Constroi o grafo bipartido e executa a atribuição de revisões (Max-Flow).
+ * Utiliza as Submissões e Revisores carregados no Parser para criar uma rede de fluxo.
+ * Em seguida, gera um ficheiro CSV com as atribuicões ou o relatorio de falhas.
+ * * @param parser O objeto Parser contendo os dados extraidos do input.csv.
+ * @param customOutput (Opcional) Nome do ficheiro de saida. Se vazio, usa a configuracao.
+ */
 void runMaxFlowAssignment(Parser& parser, const std::string& customOutput = "") {
     auto subs = parser.getSubmissions();
     auto revs = parser.getReviewers();
@@ -113,7 +141,12 @@ void runMaxFlowAssignment(Parser& parser, const std::string& customOutput = "") 
     std::cout << "[INFO] Ficheiro " << outFilename << " gerado com sucesso!\n";
 }
 
-
+/**
+ * @brief Simula a falta de um Revisor para analisar os riscos da conferencia.
+ * Reconstrói a rede de fluxo ignorando completamente as ligacoes para um
+ * revisor especifico escolhido pelo utilizador para avaliar se o fluxo maximo diminui.
+ * * @param parser O objeto Parser contendo os dados originais.
+ */
 // --- ANALISE DE RISCO ---
 void runRiskAnalysis(Parser& parser) {
     auto subs = parser.getSubmissions();
@@ -183,6 +216,10 @@ void runRiskAnalysis(Parser& parser) {
     std::cout << "=====================================\n";
 }
 
+/**
+ * @brief Executa o menu interativo da aplicacao.
+ * Permite ao utilizador ler ficheiros, gerar atribuicoes e fazer analise de risco.
+ */
 // ---(MENU) ---
 void runInteractiveMenu() {
     int choice = -1;
@@ -228,6 +265,12 @@ void runInteractiveMenu() {
     std::cout << "A encerrar o programa. Bom trabalho!\n";
 }
 
+/**
+ * @brief Corre o programa em Modo Batch (silencioso).
+ * Utilitario para automacao: le o ficheiro de entrada e gera o output sem interacao.
+ * * @param inputFile O caminho do ficheiro CSV de entrada.
+ * @param outputFile O caminho do ficheiro CSV de saida a ser gerado.
+ */
 // --- O MODO BATCH (SCRIPT) ---
 void runBatchMode(const std::string& inputFile, const std::string& outputFile) {
     std::cout << "[BATCH MODE] A iniciar...\n";
@@ -238,6 +281,13 @@ void runBatchMode(const std::string& inputFile, const std::string& outputFile) {
     std::cout << "[BATCH MODE] Leitura concluida. Ficheiro pronto para o Max-Flow.\n";
 }
 
+/**
+ * @brief Funcao principal do programa.
+ * Faz a gestao entre iniciar o modo interativo ou o modo batch.
+ * * @param argc O numero de argumentos passados na linha de comandos.
+ * @param argv O array contendo os argumentos da linha de comandos.
+ * @return int 0 em caso de sucesso.
+ */
 int main(int argc, char* argv[]) {
     
     if (argc == 4 && std::string(argv[1]) == "-b") {
