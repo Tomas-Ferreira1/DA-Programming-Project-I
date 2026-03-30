@@ -1,6 +1,117 @@
 #include <iostream>
 #include <string>
+#include <fstream>
+#include <algorithm>
 #include "Parser.h"
+#include "Graph.h"
+
+
+void runMaxFlowAssignment(Parser& parser, const std::string& customOutput = "") {
+    auto subs = parser.getSubmissions();
+    auto revs = parser.getReviewers();
+    auto config = parser.getConfig();
+
+    if (subs.empty() || revs.empty()) {
+        std::cerr << "[ERRO] Faltam dados (Submissoes ou Revisores) para correr o Max-Flow.\n";
+        return;
+    }
+
+    int N = subs.size();
+    int M = revs.size();
+    int source = 0;
+    int sink = N + M + 1;
+    int totalNodes = N + M + 2;
+
+    Graph g(totalNodes);
+
+    int minReviews = config.getMinReviewsPerSubmission();
+    int maxReviews = config.getMaxReviewsPerReviewer();
+
+    // 1. Ligar Source -> Submissions
+    for (int i = 0; i < N; ++i) {
+        g.addEdge(source, i + 1, minReviews);
+    }
+
+    // 2. Ligar Submissions -> Reviewers (Apenas Domínios Principais)
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < M; ++j) {
+            if (subs[i].getPrimaryDomain() == revs[j].getPrimaryDomain()) {
+                // Aresta da Submissão (i+1) para o Revisor (N+1+j)
+                g.addEdge(i + 1, N + 1 + j, 1);
+            }
+        }
+    }
+
+    // 3. Ligar Reviewers -> Sink
+    for (int j = 0; j < M; ++j) {
+        g.addEdge(N + 1 + j, sink, maxReviews);
+    }
+
+    // 4. Executar o Algoritmo Edmonds-Karp
+    int maxFlow = g.edmondsKarp(source, sink);
+    int requiredFlow = N * minReviews;
+
+    // 5. Gerar o ficheiro de Output
+    std::string outFilename = customOutput.empty() ? config.getOutputFileName() : customOutput;
+    std::ofstream outFile(outFilename);
+    if (!outFile.is_open()) {
+        std::cerr << "[ERRO] Nao foi possivel criar o ficheiro: " << outFilename << "\n";
+        return;
+    }
+
+    const auto& adj = g.getAdj();
+
+    if (maxFlow == requiredFlow) {
+        std::cout << "[SUCESSO] Todas as revisoes foram atribuidas! (Max-Flow: " << maxFlow << ")\n";
+
+        // Formato 1: Submissions -> Reviewers
+        outFile << "#SubmissionId,ReviewerId,Match\n";
+        for (int i = 0; i < N; ++i) {
+            for (const auto& edge : adj[i + 1]) {
+                if (edge.to >= N + 1 && edge.to <= N + M && edge.flow == 1) {
+                    int revIdx = edge.to - (N + 1);
+                    outFile << subs[i].getId() << ", " << revs[revIdx].getId() << ", " << subs[i].getPrimaryDomain() << "\n";
+                }
+            }
+        }
+
+        // Formato 2: Reviewers -> Submissions
+        outFile << "#ReviewerId,SubmissionId,Match\n";
+        for (int j = 0; j < M; ++j) {
+            for (int i = 0; i < N; ++i) {
+                for (const auto& edge : adj[i + 1]) {
+                    if (edge.to == N + 1 + j && edge.flow == 1) {
+                        outFile << revs[j].getId() << ", " << subs[i].getId() << ", " << subs[i].getPrimaryDomain() << "\n";
+                    }
+                }
+            }
+        }
+        outFile << "#Total: " << maxFlow << "\n";
+
+    } else {
+        std::cout << "[FALHA] Nao existem revisores suficientes! Gerando relatorio de falhas...\n";
+        outFile << "#SubmissionId, Domain, MissingReviews\n";
+
+        // Procurar submissões que não receberam fluxo suficiente
+        for (int i = 0; i < N; ++i) {
+            int flowReceived = 0;
+            // Para ver a água que chegou à submissão, olhamos para a aresta inversa do source
+            for (const auto& edge : adj[i + 1]) {
+                if (edge.to == source) {
+                    flowReceived = -edge.flow; // Aresta residual tem fluxo negativo
+                    break;
+                }
+            }
+            int missing = minReviews - flowReceived;
+            if (missing > 0) {
+                outFile << subs[i].getId() << ", " << subs[i].getPrimaryDomain() << ", " << missing << "\n";
+            }
+        }
+    }
+
+    outFile.close();
+    std::cout << "[INFO] Ficheiro " << outFilename << " gerado com sucesso!\n";
+}
 
 // ---(MENU) ---
 void runInteractiveMenu() {
@@ -35,7 +146,8 @@ void runInteractiveMenu() {
             std::cout << " -> Ficheiro de Output configurado para: " << parser.getConfig().getOutputFileName() << "\n";
             
         } else if (choice == 2) {
-            std::cout << "\n[INFO] O algoritmo de Max-Flow ainda esta em desenvolvimento pelo meu colega...\n";
+            std::cout << "\n[A PROCESSAR] A calcular atribuicoes perfeitas...\n";
+            runMaxFlowAssignment(parser);
         } else if (choice != 0) {
             std::cout << "\n[ERRO] Opcao invalida. Tente novamente.\n";
         }
@@ -46,17 +158,13 @@ void runInteractiveMenu() {
 // --- O MODO BATCH (SCRIPT) ---
 void runBatchMode(const std::string& inputFile, const std::string& outputFile) {
     std::cout << "[BATCH MODE] A iniciar...\n";
-    std::cout << "Input: " << inputFile << " | Output: " << outputFile << "\n";
-    
     Parser parser;
     parser.parse(inputFile);
+    runMaxFlowAssignment(parser, outputFile);
     
     std::cout << "[BATCH MODE] Leitura concluida. Ficheiro pronto para o Max-Flow.\n";
 }
 
-// --- FUNÇÃO PRINCIPAL ---
-// argc: O número de palavras escritas no terminal para correr o programa
-// argv: Um array com as palavras que o utilizador escreveu
 int main(int argc, char* argv[]) {
     
     if (argc == 4 && std::string(argv[1]) == "-b") {
