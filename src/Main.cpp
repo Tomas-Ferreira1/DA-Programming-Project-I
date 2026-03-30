@@ -113,6 +113,76 @@ void runMaxFlowAssignment(Parser& parser, const std::string& customOutput = "") 
     std::cout << "[INFO] Ficheiro " << outFilename << " gerado com sucesso!\n";
 }
 
+
+// --- ANALISE DE RISCO ---
+void runRiskAnalysis(Parser& parser) {
+    auto subs = parser.getSubmissions();
+    auto revs = parser.getReviewers();
+    auto config = parser.getConfig();
+
+    if (subs.empty() || revs.empty()) {
+        std::cerr << "[ERRO] Primeiro tem de ler o ficheiro de dados (Opcao 1)!\n";
+        return;
+    }
+
+    int missingReviewerId;
+    std::cout << "Introduza o ID do Revisor que vai faltar (ex: 1 ou 2): ";
+    std::cin >> missingReviewerId;
+
+    int N = subs.size();
+    int M = revs.size();
+    int source = 0;
+    int sink = N + M + 1;
+    int totalNodes = N + M + 2;
+
+    Graph g(totalNodes);
+
+    int minReviews = config.getMinReviewsPerSubmission();
+    int maxReviews = config.getMaxReviewsPerReviewer();
+
+    // 1. Ligar Source -> Submissions
+    for (int i = 0; i < N; ++i) {
+        g.addEdge(source, i + 1, minReviews);
+    }
+
+    // 2. Ligar Submissions -> Reviewers
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < M; ++j) {
+            // Se for o revisor que faltou, ignoramos
+            if (revs[j].getId() == missingReviewerId) {
+                continue; // Salta este revisor, ele nao recebe ligacoes
+            }
+
+            if (subs[i].getPrimaryDomain() == revs[j].getPrimaryDomain()) {
+                g.addEdge(i + 1, N + 1 + j, 1);
+            }
+        }
+    }
+
+    // 3. Ligar Reviewers -> Sink
+    for (int j = 0; j < M; ++j) {
+        if (revs[j].getId() != missingReviewerId) {
+            g.addEdge(N + 1 + j, sink, maxReviews);
+        }
+    }
+
+    // 4. Executar o Algoritmo Edmonds-Karp
+    int maxFlow = g.edmondsKarp(source, sink);
+    int requiredFlow = N * minReviews;
+
+    // 5. Avaliar e Imprimir o Risco
+    std::cout << "\n=== RESULTADO DA ANALISE DE RISCO ===\n";
+    if (maxFlow == requiredFlow) {
+        std::cout << "[BAIXO RISCO] A conferencia sobrevive sem o Revisor " << missingReviewerId << "!\n";
+        std::cout << " -> Ainda conseguimos atingir as " << requiredFlow << " revisoes necessarias.\n";
+    } else {
+        std::cout << "[ALTO RISCO] A conferencia falha sem o Revisor " << missingReviewerId << "!\n";
+        std::cout << " -> So conseguimos " << maxFlow << " revisoes das " << requiredFlow << " necessarias.\n";
+        std::cout << " -> O Revisor " << missingReviewerId << " e CRITICO para o sucesso do evento!\n";
+    }
+    std::cout << "=====================================\n";
+}
+
 // ---(MENU) ---
 void runInteractiveMenu() {
     int choice = -1;
@@ -127,6 +197,7 @@ void runInteractiveMenu() {
         std::cout << "==================================================\n";
         std::cout << "1. Ler ficheiro de dados (Parser)\n";
         std::cout << "2. Gerar Atribuicoes (Max-Flow - A implementar)\n";
+        std::cout << "3. Analise de Risco (Falta de um Revisor)\n";
         std::cout << "0. Sair\n";
         std::cout << "--------------------------------------------------\n";
         std::cout << "Escolha uma opcao: ";
@@ -148,6 +219,8 @@ void runInteractiveMenu() {
         } else if (choice == 2) {
             std::cout << "\n[A PROCESSAR] A calcular atribuicoes perfeitas...\n";
             runMaxFlowAssignment(parser);
+        } else if (choice == 3) {
+            runRiskAnalysis(parser);
         } else if (choice != 0) {
             std::cout << "\n[ERRO] Opcao invalida. Tente novamente.\n";
         }
