@@ -137,6 +137,45 @@ void runMaxFlowAssignment(Parser& parser, const std::string& customOutput = "") 
         }
     }
 
+    // 6. Adicionar Análise de Risco ao ficheiro (se configurado como 1 ou 2)
+    if (config.getRiskAnalysis() >= 1) {
+        outFile << "#Risk Analysis: 1\n";
+        bool first = true;
+
+        // Itera sobre todos os revisores para identificar os críticos
+        for (const auto& rev : revs) {
+            Graph tempG(totalNodes);
+
+            // Reconstroi o grafo base
+            for (int i = 0; i < N; ++i) tempG.addEdge(source, i + 1, minReviews);
+
+            for (int i = 0; i < N; ++i) {
+                for (int j = 0; j < M; ++j) {
+                    // Pula o revisor que estamos a testar (simula a sua ausência)
+                    if (revs[j].getId() == rev.getId()) continue;
+
+                    if (subs[i].getPrimaryDomain() == revs[j].getPrimaryDomain()) {
+                        tempG.addEdge(i + 1, N + 1 + j, 1);
+                    }
+                }
+            }
+
+            for (int j = 0; j < M; ++j) {
+                if (revs[j].getId() != rev.getId()) {
+                    tempG.addEdge(N + 1 + j, sink, maxReviews);
+                }
+            }
+
+            // Se sem este revisor não atingimos o fluxo necessário, ele é crítico
+            if (tempG.edmondsKarp(source, sink) < requiredFlow) {
+                if (!first) outFile << ", ";
+                outFile << rev.getId();
+                first = false;
+            }
+        }
+        outFile << "\n";
+    }
+
     outFile.close();
     std::cout << "[INFO] Ficheiro " << outFilename << " gerado com sucesso!\n";
 }
